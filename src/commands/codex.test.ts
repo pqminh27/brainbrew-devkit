@@ -359,6 +359,7 @@ describe('codex command/status behavior', () => {
       expect(output).toContain('Plugin-native skills: 1 declared, present');
       expect(output).toContain('Plugin MCP declaration: declared by config file');
       expect(output).toContain('Packaged MCP server: present');
+      expect(output).not.toContain('Plugin MCP declaration: none declared');
       expect(output).toContain('Packaged hook template: 1 declared, present');
       expect(output).toContain('Plugin apps: none declared');
       expect(output).toContain('Plugin assets: none declared');
@@ -366,6 +367,17 @@ describe('codex command/status behavior', () => {
     } finally {
       process.chdir(originalCwd);
     }
+  });
+
+  it('package manifest includes plugin-codex so Codex-safe MCP is published with the CLI', () => {
+    const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as { files?: string[] };
+    expect(manifest.files).toContain('plugin-codex');
+  });
+
+  it('packaged Codex MCP declaration uses mcp_servers and status can read that shape', () => {
+    const declarationPath = join(process.cwd(), 'plugin-codex', 'mcp', 'mcp-servers.json');
+    const declaration = JSON.parse(readFileSync(declarationPath, 'utf-8')) as { mcp_servers?: Record<string, unknown> };
+    expect(Object.keys(declaration.mcp_servers ?? {})).toContain('brainbrew');
   });
 
   it('status reports legacy project state for older Codex V1 workspaces', () => {

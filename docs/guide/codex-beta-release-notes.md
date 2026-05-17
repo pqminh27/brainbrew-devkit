@@ -17,6 +17,14 @@ The repository keeps Codex command and agent markdown under `plugin-codex/comman
 
 BrainBrew Codex support only installs and validates BrainBrew-owned workflow and runtime assets. Use OpenAI's curated `migrate-to-codex` skill for generic Claude Code to Codex migration.
 
+## Package Notes
+
+Publishing Codex support adds the dedicated `plugin-codex/` package to the npm tarball. The dry-run package is currently about 987 KB compressed and 4.5 MB unpacked; the bundled Codex MCP server is the largest added file.
+
+The `plugin-codex/commands/` and `plugin-codex/agents/` directories are included as source/reference assets but are not loaded by the current public Codex plugin manifest. They can be removed in a follow-up if Codex does not add supported plugin fields for them.
+
+The bundled MCP server includes compiled dependencies from the build output. Before public production, keep the license and attribution audit for vendored dependencies on the release checklist.
+
 ## Supported Hooks
 
 BrainBrew installs only Codex-supported hook events:
@@ -68,6 +76,7 @@ Before public production:
 4. Verify `codex mcp list` includes `brainbrew`; if not, register it manually as shown above.
 5. Verify `chain_list`, `chain_run`, `chain_switch`, `chain_validate`, `template_bump`, and `template_list`.
 6. Run `brainbrew codex status` and confirm unsupported hooks are `none`.
+7. Run `npm pack --dry-run --json` and confirm the package includes `plugin-codex/.codex-plugin/plugin.json`, `plugin-codex/mcp/mcp-server.cjs`, and `plugin-codex/mcp/mcp-servers.json`.
 
 ## Known Limitations
 

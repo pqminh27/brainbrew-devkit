@@ -8,7 +8,8 @@
   },
   "files": [
     "dist",
-    "plugin"
+    "plugin",
+    "plugin-codex"
   ],
   "scripts": {
     "build": "tsup",

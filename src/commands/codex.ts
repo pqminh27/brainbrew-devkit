@@ -589,9 +589,7 @@ function getMcpStatus(pluginRoot: string, manifest: CodexPluginManifest | null):
   const manifestPathMissing = getManifestPathMissing(pluginRoot, manifest?.mcpServers);
   const mcpConfigPath = typeof manifest?.mcpServers === 'string' ? manifest.mcpServers : './.mcp.json';
   const mcpConfig = readCodexPluginManifest(resolvePluginPath(pluginRoot, mcpConfigPath));
-  const configServers = mcpConfig?.mcpServers && typeof mcpConfig.mcpServers === 'object' && !Array.isArray(mcpConfig.mcpServers)
-    ? Object.keys(mcpConfig.mcpServers)
-    : [];
+  const configServers = getMcpServerNames(mcpConfig);
   const packagedServer = existsSync(join(pluginRoot, 'plugin-codex', 'mcp', 'mcp-server.cjs')) ||
     existsSync(join(pluginRoot, 'plugin', 'mcp', 'mcp-server.cjs'));
   return { declared: configServers.length, packaged: packagedServer, missing: manifestPathMissing };
@@ -602,6 +600,12 @@ function formatMcpDeclarationStatus(manifest: CodexPluginManifest | null): strin
   if (typeof manifest.mcpServers === 'string') return 'declared by config file';
   const count = Object.keys(manifest.mcpServers).length;
   return formatNativeStatus(count, []);
+}
+
+function getMcpServerNames(config: CodexPluginManifest | null): string[] {
+  const source = (config as { mcp_servers?: unknown; mcpServers?: unknown } | null)?.mcp_servers ??
+    (config as { mcp_servers?: unknown; mcpServers?: unknown } | null)?.mcpServers;
+  return source && typeof source === 'object' && !Array.isArray(source) ? Object.keys(source) : [];
 }
 
 function formatPackagedMcpStatus(status: { packaged: boolean; missing: string[] }): string {

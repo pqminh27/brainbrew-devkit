@@ -1,12 +1,41 @@
 #!/usr/bin/env node
 "use strict";
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/hooks/codex-runner.ts
+var codex_runner_exports = {};
+__export(codex_runner_exports, {
+  DEFAULT_PENDING_GATES: () => DEFAULT_PENDING_GATES,
+  LEGACY_MIGRATION_NOTICE: () => LEGACY_MIGRATION_NOTICE,
+  LEGACY_STATE_DIR: () => LEGACY_STATE_DIR,
+  STATE_DIR: () => STATE_DIR,
+  detectWorkflow: () => detectWorkflow,
+  parseExplicitGatePasses: () => parseExplicitGatePasses,
+  updateWorkflowState: () => updateWorkflowState
+});
+module.exports = __toCommonJS(codex_runner_exports);
 var import_fs = require("fs");
 var import_path = require("path");
 var STATE_DIR = (0, import_path.join)(".codex", "brainbrew");
 var LEGACY_STATE_DIR = (0, import_path.join)(".codex", "memory");
 var DEFAULT_PENDING_GATES = ["plan-review", "code-review", "security-review", "test"];
+var LEGACY_MIGRATION_NOTICE = "[brainbrew-codex] Migrated workflow state from .codex/memory/ to .codex/brainbrew/. The old directory can now be removed.";
 function readStdin() {
   try {
     return (0, import_fs.readFileSync)(0, "utf-8").trim();
@@ -106,6 +135,23 @@ function detectWorkflow(prompt) {
   }
   return null;
 }
+function parseExplicitGatePasses(prompt) {
+  const result = /* @__PURE__ */ new Set();
+  if (!prompt) return result;
+  const valid = new Set(DEFAULT_PENDING_GATES);
+  const patterns = [
+    /\/brainbrew:gate-pass\s+([a-z0-9-]+)/gi,
+    /\bbrainbrew\s+gate-pass\s+([a-z0-9-]+)/gi
+  ];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(prompt)) !== null) {
+      const gate = match[1].toLowerCase();
+      if (valid.has(gate)) result.add(gate);
+    }
+  }
+  return result;
+}
 function inferStepFromTool(toolName) {
   const lower = toolName.toLowerCase();
   if (lower.includes("spawn_agent") || lower.includes("agent") || lower.includes("task")) return "delegation";
@@ -140,6 +186,10 @@ function updateWorkflowState(state, eventName, payload, now) {
     const inferredStep = inferStepFromTool(toolName);
     if (inferredStep) workflow.currentStep = inferredStep;
   }
+  const explicitPasses = parseExplicitGatePasses(prompt);
+  if (explicitPasses.size > 0) {
+    workflow.pendingGates = workflow.pendingGates.filter((item) => !explicitPasses.has(item));
+  }
   const lowerPrompt = prompt.toLowerCase();
   const completedGates = [
     ["plan-review", ["plan reviewed", "plan approved", "reviewed the plan"]],
@@ -148,6 +198,7 @@ function updateWorkflowState(state, eventName, payload, now) {
     ["test", ["tests pass", "test passed", "verification passed", "build passed"]]
   ];
   for (const [gate, markers] of completedGates) {
+    if (explicitPasses.has(gate)) continue;
     if (markers.some((marker) => lowerPrompt.includes(marker))) {
       workflow.pendingGates = workflow.pendingGates.filter((item) => item !== gate);
     }
@@ -173,10 +224,14 @@ function main() {
     if (!memoryDir) process.exit(0);
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const stateFile = (0, import_path.join)(memoryDir, "workflow-state.json");
-    const state = (0, import_fs.existsSync)(stateFile) ? loadState(stateFile) : readLegacyState(cwd) ?? loadState(stateFile);
+    const newStateMissing = !(0, import_fs.existsSync)(stateFile);
+    const legacy = newStateMissing ? readLegacyState(cwd) : null;
+    const migratedFromLegacy = legacy !== null;
+    const state = newStateMissing ? legacy ?? loadState(stateFile) : loadState(stateFile);
     state.runnerVersion = 2;
     state.stateDir = STATE_DIR;
-    if (!state.legacyStateDir && (0, import_fs.existsSync)((0, import_path.join)(cwd, LEGACY_STATE_DIR, "workflow-state.json"))) {
+    const legacyFileExists = (0, import_fs.existsSync)((0, import_path.join)(cwd, LEGACY_STATE_DIR, "workflow-state.json"));
+    if (!state.legacyStateDir && legacyFileExists) {
       state.legacyStateDir = LEGACY_STATE_DIR;
     }
     state.eventCounts[eventName] = (state.eventCounts[eventName] ?? 0) + 1;
@@ -185,6 +240,11 @@ function main() {
     state.lastCwd = cwd;
     updateWorkflowState(state, eventName, payload, now);
     safeWriteJson(stateFile, state);
+    if (migratedFromLegacy && legacyFileExists && !state.legacyMigrationNotified) {
+      console.error(LEGACY_MIGRATION_NOTICE);
+      state.legacyMigrationNotified = true;
+      safeWriteJson(stateFile, state);
+    }
     safeAppendJsonLine((0, import_path.join)(memoryDir, "events.jsonl"), {
       event: eventName,
       at: now,
@@ -200,4 +260,16 @@ function main() {
   }
   process.exit(0);
 }
-main();
+if (!process.env.VITEST) {
+  main();
+}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  DEFAULT_PENDING_GATES,
+  LEGACY_MIGRATION_NOTICE,
+  LEGACY_STATE_DIR,
+  STATE_DIR,
+  detectWorkflow,
+  parseExplicitGatePasses,
+  updateWorkflowState
+});

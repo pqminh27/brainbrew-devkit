@@ -3,7 +3,7 @@
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 
-type RunnerState = {
+export type RunnerState = {
   runnerVersion: number;
   eventCounts: Record<string, number>;
   lastEvent: string;
@@ -11,12 +11,13 @@ type RunnerState = {
   lastCwd: string;
   stateDir: string;
   legacyStateDir?: string;
+  legacyMigrationNotified?: boolean;
   activeWorkflow?: WorkflowState;
 };
 
-type WorkflowStatus = 'running' | 'completed';
+export type WorkflowStatus = 'running' | 'completed';
 
-type WorkflowState = {
+export type WorkflowState = {
   name: string;
   status: WorkflowStatus;
   currentStep: string;
@@ -28,9 +29,10 @@ type WorkflowState = {
   pendingGates: string[];
 };
 
-const STATE_DIR = join('.codex', 'brainbrew');
-const LEGACY_STATE_DIR = join('.codex', 'memory');
-const DEFAULT_PENDING_GATES = ['plan-review', 'code-review', 'security-review', 'test'];
+export const STATE_DIR = join('.codex', 'brainbrew');
+export const LEGACY_STATE_DIR = join('.codex', 'memory');
+export const DEFAULT_PENDING_GATES = ['plan-review', 'code-review', 'security-review', 'test'];
+export const LEGACY_MIGRATION_NOTICE = '[brainbrew-codex] Migrated workflow state from .codex/memory/ to .codex/brainbrew/. The old directory can now be removed.';
 
 function readStdin(): string {
   try {
@@ -131,7 +133,7 @@ function getPayloadText(payload: Record<string, unknown>): string {
   return candidates.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim() ?? '';
 }
 
-function detectWorkflow(prompt: string): string | null {
+export function detectWorkflow(prompt: string): string | null {
   const lower = prompt.toLowerCase();
   const explicit = lower.match(/brainbrew(?:\s+codex)?\s+(?:workflow|chain|recipe)\s+([a-z0-9_-]+)/);
   if (explicit?.[1]) return explicit[1];
@@ -149,6 +151,31 @@ function detectWorkflow(prompt: string): string | null {
   return null;
 }
 
+/**
+ * Parse explicit gate-pass markers from a prompt. Recognizes both:
+ *   - `/brainbrew:gate-pass <gate-name>` (slash command form)
+ *   - `brainbrew gate-pass <gate-name>` (CLI-like form)
+ * Returns the set of valid gate names found (filtered against DEFAULT_PENDING_GATES).
+ */
+export function parseExplicitGatePasses(prompt: string): Set<string> {
+  const result = new Set<string>();
+  if (!prompt) return result;
+  const valid = new Set(DEFAULT_PENDING_GATES);
+  // Case-insensitive scan; gate names themselves are kebab-lowercase.
+  const patterns = [
+    /\/brainbrew:gate-pass\s+([a-z0-9-]+)/gi,
+    /\bbrainbrew\s+gate-pass\s+([a-z0-9-]+)/gi,
+  ];
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(prompt)) !== null) {
+      const gate = match[1].toLowerCase();
+      if (valid.has(gate)) result.add(gate);
+    }
+  }
+  return result;
+}
+
 function inferStepFromTool(toolName: string): string | null {
   const lower = toolName.toLowerCase();
   if (lower.includes('spawn_agent') || lower.includes('agent') || lower.includes('task')) return 'delegation';
@@ -157,7 +184,7 @@ function inferStepFromTool(toolName: string): string | null {
   return null;
 }
 
-function updateWorkflowState(state: RunnerState, eventName: string, payload: Record<string, unknown>, now: string): void {
+export function updateWorkflowState(state: RunnerState, eventName: string, payload: Record<string, unknown>, now: string): void {
   const prompt = getPayloadText(payload);
   if (eventName === 'UserPromptSubmit' && prompt) {
     const workflowName = detectWorkflow(prompt);
@@ -188,6 +215,13 @@ function updateWorkflowState(state: RunnerState, eventName: string, payload: Rec
     if (inferredStep) workflow.currentStep = inferredStep;
   }
 
+  // Explicit gate-pass markers take priority over English-marker heuristics.
+  // For any gate cleared explicitly, skip the heuristic pass to avoid false positives.
+  const explicitPasses = parseExplicitGatePasses(prompt);
+  if (explicitPasses.size > 0) {
+    workflow.pendingGates = workflow.pendingGates.filter(item => !explicitPasses.has(item));
+  }
+
   const lowerPrompt = prompt.toLowerCase();
   const completedGates = [
     ['plan-review', ['plan reviewed', 'plan approved', 'reviewed the plan']],
@@ -196,6 +230,8 @@ function updateWorkflowState(state: RunnerState, eventName: string, payload: Rec
     ['test', ['tests pass', 'test passed', 'verification passed', 'build passed']],
   ] as const;
   for (const [gate, markers] of completedGates) {
+    // Skip heuristic for gates already handled by explicit pass this prompt.
+    if (explicitPasses.has(gate)) continue;
     if (markers.some(marker => lowerPrompt.includes(marker))) {
       workflow.pendingGates = workflow.pendingGates.filter(item => item !== gate);
     }
@@ -227,10 +263,14 @@ function main(): void {
 
     const now = new Date().toISOString();
     const stateFile = join(memoryDir, 'workflow-state.json');
-    const state = existsSync(stateFile) ? loadState(stateFile) : readLegacyState(cwd) ?? loadState(stateFile);
+    const newStateMissing = !existsSync(stateFile);
+    const legacy = newStateMissing ? readLegacyState(cwd) : null;
+    const migratedFromLegacy = legacy !== null;
+    const state = newStateMissing ? legacy ?? loadState(stateFile) : loadState(stateFile);
     state.runnerVersion = 2;
     state.stateDir = STATE_DIR;
-    if (!state.legacyStateDir && existsSync(join(cwd, LEGACY_STATE_DIR, 'workflow-state.json'))) {
+    const legacyFileExists = existsSync(join(cwd, LEGACY_STATE_DIR, 'workflow-state.json'));
+    if (!state.legacyStateDir && legacyFileExists) {
       state.legacyStateDir = LEGACY_STATE_DIR;
     }
     state.eventCounts[eventName] = (state.eventCounts[eventName] ?? 0) + 1;
@@ -239,6 +279,12 @@ function main(): void {
     state.lastCwd = cwd;
     updateWorkflowState(state, eventName, payload, now);
     safeWriteJson(stateFile, state);
+
+    if (migratedFromLegacy && legacyFileExists && !state.legacyMigrationNotified) {
+      console.error(LEGACY_MIGRATION_NOTICE);
+      state.legacyMigrationNotified = true;
+      safeWriteJson(stateFile, state);
+    }
 
     safeAppendJsonLine(join(memoryDir, 'events.jsonl'), {
       event: eventName,
@@ -258,4 +304,7 @@ function main(): void {
   process.exit(0);
 }
 
-main();
+// Only auto-run when invoked as a script. Skip under vitest so tests can import pure functions.
+if (!process.env.VITEST) {
+  main();
+}

@@ -18,9 +18,9 @@
   ],
   "homepage": "https://github.com/brainbrewlabs/brainbrew-devkit",
   "repository": "https://github.com/brainbrewlabs/brainbrew-devkit",
-  "agents": "./agents/",
-  "commands": "./commands/",
   "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "mcpServers": "./mcp/mcp-servers.json",
   "interface": {
     "displayName": "BrainBrew DevKit",
     "shortDescription": "Workflow recipes, agents, and skills for Codex.",

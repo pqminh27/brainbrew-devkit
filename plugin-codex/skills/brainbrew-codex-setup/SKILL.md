@@ -7,6 +7,16 @@ description: Use when setting up, verifying, or repairing BrainBrew DevKit in Co
 
 Use this skill when the user asks to install BrainBrew for Codex, repair missing hooks, sync BrainBrew-owned skills, or verify that BrainBrew is available after plugin installation.
 
+## Prerequisites
+
+The `brainbrew` CLI is required for `brainbrew codex init`, `sync-brainbrew-skills`, and `status`. Install it globally if not already present:
+
+```bash
+npm install -g brainbrew-devkit
+```
+
+Verify with `brainbrew --version`. If installed via Codex marketplace alone, the CLI is NOT included automatically.
+
 ## Setup Flow
 
 1. Confirm the BrainBrew package or plugin is available locally.
@@ -36,3 +46,4 @@ Use this skill when the user asks to install BrainBrew for Codex, repair missing
 - Workflow recipes guide the work; they do not execute automatic Claude-style chain routing.
 - For generic Claude Code to Codex migration, use OpenAI's curated `migrate-to-codex` skill.
 - Do not add `SubagentStart`, `SubagentStop`, `SessionEnd`, `Notification`, `PreCompact`, or `PostCompact` to Codex hooks.
+- To mark a workflow gate as passed without relying on English-phrase heuristics, use `/brainbrew:gate-pass <gate-name>` (gates: `plan-review`, `code-review`, `security-review`, `test`).

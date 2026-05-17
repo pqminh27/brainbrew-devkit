@@ -138,13 +138,15 @@ Claude Code and opencode continue to use the existing shared MCP server and `${C
 
 The Codex MCP server is intentionally separate from the shared Claude/opencode MCP server. It does not expose Claude/opencode setup tools such as `init`, and it does not write `.claude/settings.json`.
 
+Current Codex builds install the plugin package without auto-registering plugin-declared MCP servers into the active MCP registry. To bridge that gap, `brainbrew codex init` now auto-registers the packaged BrainBrew MCP server with the `codex` CLI when it is on `$PATH`. If the CLI is unavailable or registration fails, init prints the exact manual `codex mcp add` command to run as a fallback.
+
 In Codex, check whether BrainBrew is loaded:
 
 ```bash
 codex mcp list
 ```
 
-If your Codex build does not auto-load plugin MCP declarations yet, register it manually with the installed Codex plugin package path:
+If `brainbrew` is missing (for example because `codex` was not on `$PATH` when init ran), register it manually with the installed Codex plugin package path:
 
 ```bash
 codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs
@@ -161,6 +163,8 @@ Then verify:
 ```bash
 codex mcp get brainbrew
 ```
+
+`codex mcp list` may show `Auth: Unsupported` for BrainBrew. That is expected for this local stdio server; the important field is `Status: enabled`.
 
 Do not put secrets directly in `.mcp.json`. Use Codex MCP environment options for server-specific credentials when needed.
 
@@ -217,7 +221,7 @@ Run:
 codex mcp list
 ```
 
-If `brainbrew` is not listed, your Codex build may not auto-load plugin MCP declarations. Register the installed server with `codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs`.
+If `brainbrew` is not listed, rerun `brainbrew codex init` — when the `codex` CLI is on `$PATH`, init now auto-registers the BrainBrew MCP server. If init reports that the CLI is missing or registration failed, run the manual fallback it prints: `codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs`. If `brainbrew` is listed with `Status: enabled` and `Auth: Unsupported`, that is healthy for BrainBrew's local stdio MCP server.
 
 ## Related
 

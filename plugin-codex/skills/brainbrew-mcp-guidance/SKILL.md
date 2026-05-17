@@ -5,7 +5,7 @@ description: Use when configuring or troubleshooting BrainBrew MCP access in Cod
 
 # BrainBrew MCP Guidance
 
-BrainBrew ships an MCP server at `plugin-codex/mcp/mcp-server.cjs`. Codex users should manage MCP registration with `codex mcp`.
+BrainBrew ships an MCP server at `plugin-codex/mcp/mcp-server.cjs` and plugin MCP metadata at `plugin-codex/mcp/mcp-servers.json`. The primary registration path is `brainbrew codex init`, which auto-registers the MCP server with the `codex` CLI when it is on `$PATH`. If the CLI is unavailable or registration fails, fall back to running `codex mcp add` manually as shown below.
 
 ## Verify MCP
 
@@ -13,7 +13,13 @@ BrainBrew ships an MCP server at `plugin-codex/mcp/mcp-server.cjs`. Codex users 
 codex mcp list
 ```
 
-If BrainBrew is missing, register the installed plugin's `mcp/mcp-server.cjs` with an absolute path.
+If BrainBrew is missing, register the installed plugin's `mcp/mcp-server.cjs` with an absolute path:
+
+```bash
+codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs
+```
+
+If `codex mcp list` shows `brainbrew` with `Status: enabled` and `Auth: Unsupported`, that is healthy for BrainBrew's local stdio MCP server.
 
 ## Useful BrainBrew Tools
 

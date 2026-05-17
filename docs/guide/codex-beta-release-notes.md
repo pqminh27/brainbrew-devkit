@@ -38,17 +38,19 @@ The BrainBrew MCP server is packaged at:
 plugin-codex/mcp/mcp-server.cjs
 ```
 
-The Codex plugin manifest declares MCP through `plugin-codex/mcp/mcp-servers.json`. Check whether BrainBrew is loaded:
+The Codex plugin manifest declares MCP through `plugin-codex/mcp/mcp-servers.json`. Because current Codex builds install that metadata without auto-registering it into the active MCP registry, `brainbrew codex init` now auto-registers the packaged BrainBrew MCP server with the `codex` CLI when it is on `$PATH`. Check whether BrainBrew is loaded:
 
 ```bash
 codex mcp list
 ```
 
-If your Codex build does not auto-load plugin MCP declarations yet, register MCP explicitly:
+If `brainbrew` is missing (for example because the `codex` CLI was unavailable when init ran), use the manual fallback printed by init:
 
 ```bash
 codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs
 ```
+
+`codex mcp list` may show `Auth: Unsupported`; that is expected for BrainBrew's local stdio server when `Status` is `enabled`.
 
 ## Verification Checklist
 
@@ -72,5 +74,6 @@ Before public production:
 - Codex workflows are recipe-guided, not Claude-style executable chain state machines.
 - Active Codex skills are global under `~/.codex/skills`.
 - Slash prompt commands such as `/brainbrew:init` are not part of the current public Codex plugin surface.
-- Some Codex builds may require manual MCP registration even though the plugin declares MCP metadata.
+- Current Codex builds do not auto-register plugin-declared MCP servers; `brainbrew codex init` now handles registration when the `codex` CLI is on `$PATH`, with a manual `codex mcp add` fallback otherwise.
+- `Auth: Unsupported` is expected for BrainBrew's local stdio MCP server when `Status` is `enabled`.
 - Codex MCP uses a dedicated Codex-safe server and does not expose the shared Claude/opencode `init` setup tool.

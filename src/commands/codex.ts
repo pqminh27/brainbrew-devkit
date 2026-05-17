@@ -10,6 +10,7 @@ import {
   statSync,
   writeFileSync,
 } from 'fs';
+import { execFileSync } from 'node:child_process';
 import { homedir } from 'os';
 import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -154,6 +155,12 @@ function codexInit(flags: Record<string, string>): void {
 
   console.log(`Codex hooks installed: ${codexRuntime.supportedHooks.length}/${codexRuntime.supportedHooks.length}`);
   console.log(`Updated: ${paths.hooksFile}`);
+
+  const registration = registerCodexMcpServer({ pluginRoot });
+  console.log(`MCP registration: ${registration.message}`);
+  if (registration.manualCommand) {
+    console.log(`To register manually: ${registration.manualCommand}`);
+  }
 }
 
 function codexSyncBrainbrewSkills(flags: Record<string, string>): void {
@@ -205,6 +212,23 @@ function codexStatus(flags: Record<string, string>): void {
   console.log(`BrainBrew skills: ${manifest.length}`);
   console.log(`Stale or missing generated skills: ${missingSkills.length}`);
   console.log(`Project state: ${projectState}`);
+  console.log(`MCP registration: ${describeMcpRegistration(pluginRoot)}`);
+}
+
+function describeMcpRegistration(pluginRoot: string | null): string {
+  if (!pluginRoot) return 'unknown (plugin root not resolved)';
+  const serverPath = locatePackagedCodexMcpServer(pluginRoot);
+  const runner = defaultCodexCliRunner();
+  if (!runner.which('codex')) {
+    return 'unknown (codex CLI not on PATH)';
+  }
+  if (runner.get('brainbrew')) {
+    return 'brainbrew registered';
+  }
+  const manual = serverPath
+    ? `codex mcp add brainbrew -- node ${serverPath}`
+    : 'codex mcp add brainbrew -- node <path-to-mcp-server.cjs>';
+  return `not registered — run brainbrew codex init or ${manual}`;
 }
 
 export function quoteCommandPath(path: string): string {
@@ -763,4 +787,106 @@ function copyRecursive(src: string, dest: string, sourceRoot: string): void {
 function normalizedSourcePath(sourcePath: string): string {
   const rel = relative(process.cwd(), sourcePath);
   return rel.startsWith('..') ? sourcePath : rel;
+}
+
+export type McpRegistrationStatus =
+  | 'registered'
+  | 'already-registered'
+  | 'cli-missing'
+  | 'failed'
+  | 'no-server';
+
+export type McpRegistrationResult = {
+  status: McpRegistrationStatus;
+  message: string;
+  manualCommand?: string;
+};
+
+export type CodexCliRunner = {
+  which: (cmd: string) => boolean;
+  get: (name: string) => boolean;
+  add: (args: string[]) => void;
+};
+
+export function locatePackagedCodexMcpServer(pluginRoot: string): string | null {
+  const codexPath = join(pluginRoot, 'plugin-codex', 'mcp', 'mcp-server.cjs');
+  if (existsSync(codexPath)) return codexPath;
+  const fallback = join(pluginRoot, 'plugin', 'mcp', 'mcp-server.cjs');
+  if (existsSync(fallback)) return fallback;
+  return null;
+}
+
+export function buildCodexMcpAddArgs(name: string, serverPath: string): string[] {
+  return ['mcp', 'add', name, '--', 'node', serverPath];
+}
+
+function defaultCodexCliRunner(): CodexCliRunner {
+  return {
+    which: () => {
+      try {
+        execFileSync('codex', ['--version'], { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    get: name => {
+      try {
+        execFileSync('codex', ['mcp', 'get', name], { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    add: args => {
+      execFileSync('codex', args, { stdio: 'pipe' });
+    },
+  };
+}
+
+export function registerCodexMcpServer(options: {
+  pluginRoot: string;
+  name?: string;
+  runner?: CodexCliRunner;
+}): McpRegistrationResult {
+  const name = options.name ?? 'brainbrew';
+  const serverPath = locatePackagedCodexMcpServer(options.pluginRoot);
+  if (!serverPath) {
+    return {
+      status: 'no-server',
+      message: 'Packaged Codex MCP server not found in plugin tree',
+    };
+  }
+
+  const runner = options.runner ?? defaultCodexCliRunner();
+  const manualCommand = `codex mcp add ${name} -- node ${serverPath}`;
+
+  if (!runner.which('codex')) {
+    return {
+      status: 'cli-missing',
+      message: 'codex CLI not on PATH; register the MCP server manually',
+      manualCommand,
+    };
+  }
+
+  if (runner.get(name)) {
+    return {
+      status: 'already-registered',
+      message: `${name} MCP server already registered`,
+    };
+  }
+
+  try {
+    runner.add(buildCodexMcpAddArgs(name, serverPath));
+    return {
+      status: 'registered',
+      message: `Registered ${name} MCP server with codex (${serverPath})`,
+    };
+  } catch (err) {
+    return {
+      status: 'failed',
+      message: `Failed to register ${name} MCP server: ${(err as Error).message}`,
+      manualCommand,
+    };
+  }
 }

@@ -11,7 +11,7 @@ Run:
 brainbrew codex init
 ```
 
-Then report the updated hooks file path and whether `hooks = true` is enabled in `~/.codex/config.toml`.
+Then report the updated hooks file path and whether `hooks = true` is enabled in `~/.codex/config.toml`. `brainbrew codex init` also auto-registers the BrainBrew MCP server with the `codex` CLI when it is on `$PATH`; if registration is skipped or fails, surface the manual command printed by init.
 
 Guardrails:
 

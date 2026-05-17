@@ -98,18 +98,22 @@ BrainBrew DevKit does not perform generic Claude Code or OpenCode migration. For
 
 ### MCP
 
-BrainBrew packages a dedicated Codex-safe MCP server in `plugin-codex/mcp/mcp-server.cjs`, declares it through `plugin-codex/mcp/mcp-servers.json`, and keeps Claude/opencode MCP metadata in `plugin/.mcp.json`. The Codex server does not expose Claude/opencode setup tools such as the shared `init` MCP tool. Check whether Codex loaded the plugin MCP server:
+BrainBrew packages a dedicated Codex-safe MCP server in `plugin-codex/mcp/mcp-server.cjs`, declares it through `plugin-codex/mcp/mcp-servers.json`, and keeps Claude/opencode MCP metadata in `plugin/.mcp.json`. The Codex server does not expose Claude/opencode setup tools such as the shared `init` MCP tool.
+
+Current Codex builds may install plugin MCP metadata without auto-registering it into the active MCP registry. Check whether Codex loaded the plugin MCP server:
 
 ```bash
 codex mcp list
 ```
 
-If your Codex build does not auto-load plugin MCP declarations yet, register the installed Codex plugin server explicitly:
+If `brainbrew` is missing, register the installed Codex plugin server explicitly:
 
 ```bash
 codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs
 codex mcp list
 ```
+
+`Auth: Unsupported` is expected for BrainBrew's local stdio MCP server as long as `Status` is `enabled`.
 
 For local development from this repository, use `./plugin-codex/mcp/mcp-server.cjs`.
 

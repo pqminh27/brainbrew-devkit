@@ -7,13 +7,16 @@ import { CODEX_UNSUPPORTED_HOOKS, codexRuntime } from '../core/runtimes/codex.js
 import {
   CODEX_TOOL_MATCHER,
   buildCodexHookEntry,
+  buildCodexMcpAddArgs,
   codexCommand,
   collectCodexSkillSources,
   createCodexHooks,
   createCodexSkillProjection,
+  locatePackagedCodexMcpServer,
   mergeCodexHooks,
   quoteCommandPath,
   readCodexHooksFile,
+  registerCodexMcpServer,
   syncCodexSkills,
   writeCodexHooksFile,
 } from './codex.js';
@@ -428,6 +431,110 @@ describe('codex command/status behavior', () => {
       'brainbrew:sync-brainbrew-skills',
       'brainbrew:template-bump',
     ]);
+  });
+
+  it('locatePackagedCodexMcpServer prefers plugin-codex over plugin fallback', () => {
+    const root = tempDir();
+    mkdirSync(join(root, 'plugin-codex', 'mcp'), { recursive: true });
+    mkdirSync(join(root, 'plugin', 'mcp'), { recursive: true });
+    writeFileSync(join(root, 'plugin-codex', 'mcp', 'mcp-server.cjs'), '');
+    writeFileSync(join(root, 'plugin', 'mcp', 'mcp-server.cjs'), '');
+    expect(locatePackagedCodexMcpServer(root)).toBe(join(root, 'plugin-codex', 'mcp', 'mcp-server.cjs'));
+  });
+
+  it('locatePackagedCodexMcpServer falls back to plugin/mcp when plugin-codex is missing', () => {
+    const root = tempDir();
+    mkdirSync(join(root, 'plugin', 'mcp'), { recursive: true });
+    writeFileSync(join(root, 'plugin', 'mcp', 'mcp-server.cjs'), '');
+    expect(locatePackagedCodexMcpServer(root)).toBe(join(root, 'plugin', 'mcp', 'mcp-server.cjs'));
+  });
+
+  it('locatePackagedCodexMcpServer returns null when neither path exists', () => {
+    const root = tempDir();
+    expect(locatePackagedCodexMcpServer(root)).toBeNull();
+  });
+
+  it('buildCodexMcpAddArgs returns the exact codex mcp add arg array', () => {
+    expect(buildCodexMcpAddArgs('brainbrew', '/abs/mcp-server.cjs')).toEqual([
+      'mcp',
+      'add',
+      'brainbrew',
+      '--',
+      'node',
+      '/abs/mcp-server.cjs',
+    ]);
+  });
+
+  it('registerCodexMcpServer returns no-server when packaged MCP server is absent', () => {
+    const root = tempDir();
+    const result = registerCodexMcpServer({
+      pluginRoot: root,
+      runner: { which: () => true, get: () => false, add: () => {} },
+    });
+    expect(result.status).toBe('no-server');
+    expect(result.manualCommand).toBeUndefined();
+  });
+
+  it('registerCodexMcpServer returns cli-missing with manual command when codex CLI is absent', () => {
+    const root = tempDir();
+    mkdirSync(join(root, 'plugin-codex', 'mcp'), { recursive: true });
+    const serverPath = join(root, 'plugin-codex', 'mcp', 'mcp-server.cjs');
+    writeFileSync(serverPath, '');
+    const result = registerCodexMcpServer({
+      pluginRoot: root,
+      runner: { which: () => false, get: () => false, add: () => { throw new Error('should not be called'); } },
+    });
+    expect(result.status).toBe('cli-missing');
+    expect(result.manualCommand).toBe(`codex mcp add brainbrew -- node ${serverPath}`);
+  });
+
+  it('registerCodexMcpServer returns already-registered when codex mcp get succeeds', () => {
+    const root = tempDir();
+    mkdirSync(join(root, 'plugin-codex', 'mcp'), { recursive: true });
+    writeFileSync(join(root, 'plugin-codex', 'mcp', 'mcp-server.cjs'), '');
+    const result = registerCodexMcpServer({
+      pluginRoot: root,
+      runner: { which: () => true, get: () => true, add: () => { throw new Error('should not be called'); } },
+    });
+    expect(result.status).toBe('already-registered');
+    expect(result.manualCommand).toBeUndefined();
+  });
+
+  it('registerCodexMcpServer returns registered when codex mcp add succeeds', () => {
+    const root = tempDir();
+    mkdirSync(join(root, 'plugin-codex', 'mcp'), { recursive: true });
+    const serverPath = join(root, 'plugin-codex', 'mcp', 'mcp-server.cjs');
+    writeFileSync(serverPath, '');
+    const addCalls: string[][] = [];
+    const result = registerCodexMcpServer({
+      pluginRoot: root,
+      runner: {
+        which: () => true,
+        get: () => false,
+        add: args => { addCalls.push(args); },
+      },
+    });
+    expect(result.status).toBe('registered');
+    expect(addCalls).toEqual([['mcp', 'add', 'brainbrew', '--', 'node', serverPath]]);
+    expect(result.message).toContain(serverPath);
+  });
+
+  it('registerCodexMcpServer returns failed with manual command when codex mcp add throws', () => {
+    const root = tempDir();
+    mkdirSync(join(root, 'plugin-codex', 'mcp'), { recursive: true });
+    const serverPath = join(root, 'plugin-codex', 'mcp', 'mcp-server.cjs');
+    writeFileSync(serverPath, '');
+    const result = registerCodexMcpServer({
+      pluginRoot: root,
+      runner: {
+        which: () => true,
+        get: () => false,
+        add: () => { throw new Error('boom'); },
+      },
+    });
+    expect(result.status).toBe('failed');
+    expect(result.manualCommand).toBe(`codex mcp add brainbrew -- node ${serverPath}`);
+    expect(result.message).toContain('boom');
   });
 
   it('packaged Codex MCP server exposes only Codex-safe BrainBrew workflow tools', () => {

@@ -35,7 +35,7 @@ Verify with `brainbrew --version`. If installed via Codex marketplace alone, the
    hooks = true
    ```
 
-5. If MCP tools are needed, compare `codex mcp list` with the packaged server at `plugin-codex/mcp/mcp-server.cjs`.
+5. `brainbrew codex init` auto-registers the MCP server when the `codex` CLI is on `$PATH`. If the CLI is unavailable or registration fails, run the manual command printed by init (`codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs`). `Auth: Unsupported` is expected when `Status` is `enabled`.
 
 ## Codex Runtime Rules
 

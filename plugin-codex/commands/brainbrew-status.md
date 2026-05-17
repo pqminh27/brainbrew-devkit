@@ -11,7 +11,7 @@ Run:
 brainbrew codex status
 ```
 
-If MCP access is relevant, also run:
+`brainbrew codex status` now also reports BrainBrew MCP registration status with the `codex` CLI when it is on `$PATH`. If MCP access needs deeper inspection, also run:
 
 ```bash
 codex mcp list

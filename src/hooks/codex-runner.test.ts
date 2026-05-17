@@ -113,6 +113,18 @@ describe('updateWorkflowState — gate handling', () => {
     }
   });
 
+  it('does not run English-marker heuristics when explicit gate-pass syntax is present', () => {
+    const state = makeState();
+    startWorkflow(state);
+    updateWorkflowState(
+      state,
+      'UserPromptSubmit',
+      { prompt: '/brainbrew:gate-pass test plan approved code review passed security scan passed' },
+      '2026-01-01T00:04:30.000Z',
+    );
+    expect(state.activeWorkflow?.pendingGates).toEqual(['plan-review', 'code-review', 'security-review']);
+  });
+
   it('clears all four gates one by one and marks the workflow completed', () => {
     const state = makeState();
     startWorkflow(state);

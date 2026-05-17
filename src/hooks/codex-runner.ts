@@ -216,10 +216,15 @@ export function updateWorkflowState(state: RunnerState, eventName: string, paylo
   }
 
   // Explicit gate-pass markers take priority over English-marker heuristics.
-  // For any gate cleared explicitly, skip the heuristic pass to avoid false positives.
+  // When present, treat them as the authoritative gate update for this prompt.
   const explicitPasses = parseExplicitGatePasses(prompt);
   if (explicitPasses.size > 0) {
     workflow.pendingGates = workflow.pendingGates.filter(item => !explicitPasses.has(item));
+    if (workflow.pendingGates.length === 0) {
+      workflow.status = 'completed';
+      workflow.currentStep = 'completed';
+    }
+    return;
   }
 
   const lowerPrompt = prompt.toLowerCase();
@@ -230,8 +235,6 @@ export function updateWorkflowState(state: RunnerState, eventName: string, paylo
     ['test', ['tests pass', 'test passed', 'verification passed', 'build passed']],
   ] as const;
   for (const [gate, markers] of completedGates) {
-    // Skip heuristic for gates already handled by explicit pass this prompt.
-    if (explicitPasses.has(gate)) continue;
     if (markers.some(marker => lowerPrompt.includes(marker))) {
       workflow.pendingGates = workflow.pendingGates.filter(item => item !== gate);
     }

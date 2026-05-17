@@ -189,6 +189,11 @@ function updateWorkflowState(state, eventName, payload, now) {
   const explicitPasses = parseExplicitGatePasses(prompt);
   if (explicitPasses.size > 0) {
     workflow.pendingGates = workflow.pendingGates.filter((item) => !explicitPasses.has(item));
+    if (workflow.pendingGates.length === 0) {
+      workflow.status = "completed";
+      workflow.currentStep = "completed";
+    }
+    return;
   }
   const lowerPrompt = prompt.toLowerCase();
   const completedGates = [
@@ -198,7 +203,6 @@ function updateWorkflowState(state, eventName, payload, now) {
     ["test", ["tests pass", "test passed", "verification passed", "build passed"]]
   ];
   for (const [gate, markers] of completedGates) {
-    if (explicitPasses.has(gate)) continue;
     if (markers.some((marker) => lowerPrompt.includes(marker))) {
       workflow.pendingGates = workflow.pendingGates.filter((item) => item !== gate);
     }

@@ -50,13 +50,15 @@ function makePluginRoot(): string {
   mkdirSync(join(root, 'plugin', 'config', 'templates', 'beta', 'agents'), { recursive: true });
   const codexManifest = JSON.stringify({
     name: 'brainbrew-devkit',
-    agents: './agents/',
-    commands: './commands/',
     skills: './skills/',
     hooks: './hooks.json',
+    mcpServers: './mcp/mcp-servers.json',
   });
   writeFileSync(join(root, 'plugin-codex', '.codex-plugin', 'plugin.json'), codexManifest);
   writeFileSync(join(root, 'plugin', '.codex-plugin', 'plugin.json'), codexManifest);
+  writeFileSync(join(root, 'plugin-codex', 'mcp', 'mcp-servers.json'), JSON.stringify({
+    mcp_servers: { brainbrew: { type: 'stdio', command: 'node', args: ['./mcp/mcp-server.cjs'], cwd: '.' } },
+  }));
   writeFileSync(join(root, 'plugin', '.mcp.json'), JSON.stringify({
     mcpServers: { brainbrew: { type: 'stdio' } },
   }));
@@ -349,10 +351,10 @@ describe('codex command/status behavior', () => {
       codexCommand(['status'], { 'plugin-root': pluginRoot, home: codexHome });
       const output = vi.mocked(console.log).mock.calls.flat().join('\n');
       expect(output).toContain('Plugin manifest: present');
-      expect(output).toContain('Plugin commands: 5 declared, present');
-      expect(output).toContain('Plugin agents: 1 declared, present');
+      expect(output).toContain('Plugin commands: none declared');
+      expect(output).toContain('Plugin agents: none declared');
       expect(output).toContain('Plugin-native skills: 1 declared, present');
-      expect(output).toContain('Plugin MCP declaration: none declared');
+      expect(output).toContain('Plugin MCP declaration: declared by config file');
       expect(output).toContain('Packaged MCP server: present');
       expect(output).toContain('Packaged hook template: 1 declared, present');
       expect(output).toContain('Plugin apps: none declared');

@@ -71,7 +71,7 @@ Codex support is first-class, but the runtime mechanism is different:
 |---|---|
 | Claude Code | native orchestration |
 | opencode | OHO bridge support |
-| Codex | plugin-native commands/agents/skills plus recipe-guided workflows with global skills and supported hooks |
+| Codex | plugin skills, hooks, MCP metadata, global skills, and recipe-guided workflows |
 
 Install the BrainBrew plugin in Codex:
 
@@ -88,7 +88,7 @@ brainbrew codex sync-brainbrew-skills
 brainbrew codex status
 ```
 
-The dedicated Codex plugin package also ships native prompt commands (`/brainbrew:init`, `/brainbrew:chain-run`, `/brainbrew:template-bump`, `/brainbrew:sync-brainbrew-skills`, `/brainbrew:status`), role agents, and curated BrainBrew skills. Codex workflow YAML is guidance, not an executable chain state machine. See [docs/guide/codex-support.md](docs/guide/codex-support.md) for setup, MCP registration, and troubleshooting.
+The dedicated Codex plugin package ships curated BrainBrew skills, supported hook metadata, and a Codex-safe MCP declaration. Codex workflow YAML is guidance, not an executable chain state machine. The current public Codex plugin manifest does not declare prompt commands or agents, so use the `brainbrew codex ...` shell commands for setup and diagnostics. See [docs/guide/codex-support.md](docs/guide/codex-support.md) for setup, MCP registration, and troubleshooting.
 
 ## Build your own chain (recommended)
 

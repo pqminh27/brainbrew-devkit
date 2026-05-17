@@ -46,4 +46,4 @@ Verify with `brainbrew --version`. If installed via Codex marketplace alone, the
 - Workflow recipes guide the work; they do not execute automatic Claude-style chain routing.
 - For generic Claude Code to Codex migration, use OpenAI's curated `migrate-to-codex` skill.
 - Do not add `SubagentStart`, `SubagentStop`, `SessionEnd`, `Notification`, `PreCompact`, or `PostCompact` to Codex hooks.
-- To mark a workflow gate as passed without relying on English-phrase heuristics, use `/brainbrew:gate-pass <gate-name>` (gates: `plan-review`, `code-review`, `security-review`, `test`).
+- To mark a workflow gate as passed without relying on English-phrase heuristics, tell Codex `brainbrew gate-pass <gate-name>` in your prompt (gates: `plan-review`, `code-review`, `security-review`, `test`).

@@ -5,10 +5,9 @@ BrainBrew supports Codex as a first-class runtime with a Codex-specific setup pa
 ## What Is Included
 
 - A dedicated Codex plugin package under `plugin-codex/`.
-- Plugin-native prompt commands under `plugin-codex/commands/`.
-- Plugin-native Codex agent guidance under `plugin-codex/agents/`.
 - Curated Codex-safe BrainBrew skills under `plugin-codex/skills/`.
-- Packaged MCP server under `plugin-codex/mcp/`.
+- Packaged MCP server under `plugin-codex/mcp/`, declared through the Codex plugin manifest.
+- Supported hook metadata under `plugin-codex/hooks.json`, declared through the Codex plugin manifest.
 - Global hook integration through `~/.codex/hooks.json`.
 - Global skill sync into `~/.codex/skills`.
 - Workflow recipe skills generated from BrainBrew templates.
@@ -20,6 +19,7 @@ BrainBrew supports Codex as a first-class runtime with a Codex-specific setup pa
 - Automatic chain execution as a state machine.
 - Claude-only `SubagentStart` or `SubagentStop` lifecycle hooks.
 - Plugin-local active skills.
+- Auto-loaded Codex prompt commands or Codex agent declarations. The `plugin-codex/commands/` and `plugin-codex/agents/` files are kept as source/reference assets until Codex exposes a supported plugin spec field for them.
 - Generic Claude Code or OpenCode migration. Use OpenAI's curated `migrate-to-codex` skill for that.
 - Claude/opencode MCP setup tools such as the shared `init` MCP tool.
 
@@ -57,32 +57,34 @@ hooks = true
 
 `plugin_hooks = false` is acceptable. BrainBrew installs its supported hook entries globally.
 
-## Plugin-Native Assets
+## Plugin Assets
 
-After plugin install, Codex can discover BrainBrew assets directly from the plugin package:
+After plugin install, Codex can discover the spec-declared BrainBrew assets directly from the plugin package:
 
 | Asset | Path | Purpose |
 |-------|------|---------|
-| Commands | `plugin-codex/commands/brainbrew-*.md` | Prompt shortcuts for setup, BrainBrew-owned skill sync, diagnostics, chain-run guidance, and template bumping |
-| Agents | `plugin-codex/agents/openai.yaml`, `plugin-codex/agents/brainbrew-codex-*.md` | Codex-facing role guidance for setup coordination and diagnostics |
 | Skills | `plugin-codex/skills/brainbrew-*` | Curated setup, workflow, and MCP guidance that is safe for Codex |
-| MCP | `plugin-codex/mcp/mcp-server.cjs` | Packaged MCP server for manual `codex mcp add` registration |
+| Hooks | `plugin-codex/hooks.json` | Supported Codex hook metadata for the plugin runtime |
+| MCP | `plugin-codex/mcp/mcp-servers.json` | Codex MCP declaration for the packaged BrainBrew MCP server |
+| MCP server | `plugin-codex/mcp/mcp-server.cjs` | Packaged Codex-safe BrainBrew workflow MCP server |
 
 These assets do not replace the global sync step. `brainbrew codex sync-brainbrew-skills` still projects template skills, template agents, and workflow YAML into `~/.codex/skills` so Codex can trigger them reliably across projects.
 
-BrainBrew DevKit does not perform generic Claude Code or OpenCode migration. For generic Claude Code to Codex migration, use OpenAI's curated `migrate-to-codex` skill. BrainBrew Codex commands only install and validate BrainBrew-owned workflow and runtime assets.
+The repository also contains Codex command and agent markdown under `plugin-codex/commands/` and `plugin-codex/agents/`. Those files are not declared in the public Codex plugin manifest because the current verified Codex plugin spec does not expose supported `commands` or `agents` fields. Treat them as source/reference assets, not marketplace-loaded prompt commands.
+
+BrainBrew DevKit does not perform generic Claude Code or OpenCode migration. For generic Claude Code to Codex migration, use OpenAI's curated `migrate-to-codex` skill. BrainBrew Codex CLI commands only install and validate BrainBrew-owned workflow and runtime assets.
 
 ## Commands
 
-Plugin-native Codex prompt commands:
+Shell commands:
 
 | Command | Purpose |
 |---------|---------|
-| `/brainbrew:init` | Run `brainbrew codex init` |
-| `/brainbrew:sync-brainbrew-skills` | Run `brainbrew codex sync-brainbrew-skills` |
-| `/brainbrew:status` | Run `brainbrew codex status` and optionally MCP diagnostics |
-| `/brainbrew:chain-run develop` | Follow or MCP-run a BrainBrew workflow recipe |
-| `/brainbrew:template-bump develop` | Use MCP `template_bump` to set up a workflow template |
+| `brainbrew codex init` | Install supported BrainBrew hook entries into `~/.codex/hooks.json` |
+| `brainbrew codex sync-brainbrew-skills` | Project BrainBrew-owned skills, role skills, and workflow recipe skills into `~/.codex/skills` |
+| `brainbrew codex status` | Report Codex config, hook, plugin asset, MCP, skill, and project-state health |
+
+Within Codex, use the installed BrainBrew skills and MCP tools directly. Slash prompt commands such as `/brainbrew:init` are not part of the current public Codex plugin surface.
 
 ### `brainbrew codex init`
 
@@ -120,23 +122,29 @@ Reports config, hook, runner, and skill health:
 
 ## MCP
 
-BrainBrew's Codex-safe MCP server is packaged at:
+BrainBrew's Codex-safe MCP server is declared by the plugin manifest through:
+
+```text
+plugin-codex/mcp/mcp-servers.json
+```
+
+The MCP config points to the packaged server:
 
 ```text
 plugin-codex/mcp/mcp-server.cjs
 ```
 
-For the Codex beta, MCP registration is explicit instead of auto-loaded from the plugin manifest. This avoids relying on unverified plugin-root variable expansion in Codex MCP configs. Claude Code and opencode continue to use the existing shared MCP server and `${CLAUDE_PLUGIN_ROOT}` entry in `plugin/.mcp.json`.
+Claude Code and opencode continue to use the existing shared MCP server and `${CLAUDE_PLUGIN_ROOT}` entry in `plugin/.mcp.json`.
 
 The Codex MCP server is intentionally separate from the shared Claude/opencode MCP server. It does not expose Claude/opencode setup tools such as `init`, and it does not write `.claude/settings.json`.
 
-In Codex, check whether BrainBrew is already registered:
+In Codex, check whether BrainBrew is loaded:
 
 ```bash
 codex mcp list
 ```
 
-If it is missing, register it manually with the installed Codex plugin package path:
+If your Codex build does not auto-load plugin MCP declarations yet, register it manually with the installed Codex plugin package path:
 
 ```bash
 codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs
@@ -209,7 +217,7 @@ Run:
 codex mcp list
 ```
 
-If `brainbrew` is not listed, register the installed server with `codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs`.
+If `brainbrew` is not listed, your Codex build may not auto-load plugin MCP declarations. Register the installed server with `codex mcp add brainbrew -- node <installed-codex-plugin-root>/mcp/mcp-server.cjs`.
 
 ## Related
 
